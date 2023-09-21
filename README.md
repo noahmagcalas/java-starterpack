@@ -2,7 +2,7 @@
 
 <a href="https://mechmania.org"><img width="25%" src="https://github.com/MechMania-29/Website/blob/main/images/mm29_logo.png" alt="MechMania 29"></a>
 
-### [website](https://mechmania.org) | [python-starterpack](https://github.com/MechMania-29/python-starterpack) | java-starterpack | [visualizer](https://github.com/MechMania-29/visualizer) | [engine](https://github.com/MechMania-29/engine)
+### [website](https://mechmania.org) | [python-starterpack](https://github.com/MechMania-29/python-starterpack) | java-starterpack | [visualizer](https://github.com/MechMania-29/visualizer) | [engine](https://github.com/MechMania-29/engine) | [wiki](https://github.com/MechMania-29/Wiki)
 
 # MechMania Java Starterpack
 
