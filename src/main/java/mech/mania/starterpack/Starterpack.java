@@ -12,9 +12,10 @@ import mech.mania.starterpack.network.Client;
 import mech.mania.starterpack.network.ReceivedMessage;
 import mech.mania.starterpack.strategy.Strategy;
 
-import java.io.IOException;
-import java.util.List;
-import java.util.Map;
+import java.io.*;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.*;
 
 import static mech.mania.starterpack.strategy.ChooseStrategy.chooseStrategy;
 
@@ -36,6 +37,25 @@ public class Starterpack {
             Usage: java -jar starterpack.jar serve [port]
 
             Port is the port to serve on""";
+
+    private static final Map<RunOpponent, List<PrefixCommandPair>> COMMANDS_FOR_OPPONENT = Map.of(
+            RunOpponent.SELF, List.of(
+                    new PrefixCommandPair("Engine", List.of("java", "-jar", "engine/engine.jar", "9001", "9002")),
+                    new PrefixCommandPair("Human", List.of("java", "-jar", "build/libs/starterpack.jar", "serve", "9001")),
+                    new PrefixCommandPair("Zombie", List.of("java", "-jar", "build/libs/starterpack.jar", "serve", "9002"))
+            ),
+            RunOpponent.HUMAN_COMPUTER, List.of(
+                    new PrefixCommandPair("Engine", List.of("java", "-jar", "engine/engine.jar", "0", "9002")),
+                    new PrefixCommandPair("Zombie", List.of("java", "-jar", "build/libs/starterpack.jar", "serve", "9002"))
+            ),
+            RunOpponent.ZOMBIE_COMPUTER, List.of(
+                    new PrefixCommandPair("Engine", List.of("java", "-jar", "engine/engine.jar", "9001", "0")),
+                    new PrefixCommandPair("Human", List.of("java", "-jar", "build/libs/starterpack.jar", "serve", "9001"))
+            )
+    );
+
+    private record PrefixCommandPair(String prefix, List<String> command) {}
+
     private enum RunOpponent {
         SELF("self"),
         HUMAN_COMPUTER("humanComputer"),
@@ -52,9 +72,171 @@ public class Starterpack {
         }
     }
 
-    private static void run(RunOpponent opponent) {
-        System.out.printf("Running against %s...\n", opponent);
-        throw new RuntimeException("Not yet implemented");
+    private record RunAndOutputArgs(boolean isErr, long timeNs, int index, String line) {}
+
+    private static void runAndOutput(InputStream io, int i, boolean isErr, List<RunAndOutputArgs> output) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(io))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                output.add(new RunAndOutputArgs(isErr, System.nanoTime(), i, line.trim()));
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void run(RunOpponent opponent) throws IOException, InterruptedException {
+        ProcessBuilder checkLatestEngine = new ProcessBuilder("python", "engine.py");
+        checkLatestEngine.redirectOutput(ProcessBuilder.Redirect.INHERIT);
+        checkLatestEngine.redirectError(ProcessBuilder.Redirect.INHERIT);
+        Process checkLatestEngineProcess = checkLatestEngine.start();
+        int checkLatestEngineExitCode = checkLatestEngineProcess.waitFor();
+
+        if (checkLatestEngineExitCode != 0) {
+            System.exit(1);
+        }
+
+        System.out.println("Attempting to build starterpack...");
+
+        boolean oneWorked = false;
+        List<String> gradleOutputs = new ArrayList<>();
+        for (String possibleGradle : List.of("./gradlew", "./gradlew.bat")) {
+            try {
+                ProcessBuilder processBuilder = new ProcessBuilder(possibleGradle, "build");
+                processBuilder.redirectOutput(ProcessBuilder.Redirect.PIPE);
+                processBuilder.redirectErrorStream(true);
+                Process process = processBuilder.start();
+                int exitCode = process.waitFor();
+
+                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    gradleOutputs.add(line);
+                }
+
+                if (exitCode == 0) {
+                    oneWorked = true;
+                    break;
+                }
+            } catch (IOException e) {
+                StackTraceElement[] stackTrace = e.getStackTrace();
+                for (StackTraceElement element : stackTrace) {
+                    gradleOutputs.add(element.toString());
+                }
+            }
+        }
+
+        if (!oneWorked) {
+            for (String output : gradleOutputs) {
+                System.err.println(output);
+            }
+            System.exit(1);
+        }
+
+        System.out.println("Running against opponent " + opponent.name() + "... (might take a minute, please wait)");
+
+        List<PrefixCommandPair> prefixCommandPairs = COMMANDS_FOR_OPPONENT.get(opponent);
+
+        DateFormat dateFormat = new SimpleDateFormat("yyyy_MM_dd__HH_mm_ss");
+        String formattedNow = dateFormat.format(new Date());
+        String gamelogName = "gamelog_" + formattedNow;
+        String outputLoc = "gamelogs/" + gamelogName + ".json";
+
+        Map<String, String> newEnv = new HashMap<>(System.getenv());
+        newEnv.put("OUTPUT", outputLoc);
+
+        List<Process> processes = new ArrayList<>();
+        for (PrefixCommandPair pair: prefixCommandPairs) {
+            List<String> command = pair.command();
+            ProcessBuilder processBuilder = new ProcessBuilder();
+            processBuilder.command(command);
+            processBuilder.redirectOutput(ProcessBuilder.Redirect.PIPE);
+            processBuilder.redirectError(ProcessBuilder.Redirect.PIPE);
+            processBuilder.environment().putAll(newEnv);
+
+            try {
+                Process process = processBuilder.start();
+                processes.add(process);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        List<List<RunAndOutputArgs>> outputs = new ArrayList<>();
+        List<Thread> threads = new ArrayList<>();
+
+        for (int i = processes.size() - 1; i >= 0; i--) {
+            Process process = processes.get(i);
+
+            List<RunAndOutputArgs> list = new ArrayList<>();
+
+            int finalI = i;
+            Thread threadStdout = new Thread(() -> runAndOutput(process.getInputStream(), finalI, false, list));
+            Thread threadStderr = new Thread(() -> runAndOutput(process.getErrorStream(), finalI, true, list));
+            threadStdout.start();
+            threadStderr.start();
+
+            threads.add(threadStdout);
+            threads.add(threadStderr);
+            outputs.add(list);
+        }
+
+        for (Thread thread : threads) {
+            thread.join();
+        }
+
+        List<RunAndOutputArgs> all = new ArrayList<>();
+
+        for (List<RunAndOutputArgs> output : outputs) {
+            all.addAll(output);
+        }
+
+        all.sort(Comparator.comparingLong(runAndOutputArgs -> runAndOutputArgs.timeNs));
+
+        int last = -1;
+
+        for (RunAndOutputArgs data : all) {
+            boolean isErr = data.isErr;
+            long timeNs = data.timeNs;
+            int i = data.index;
+            String line = data.line;
+
+            if (i != last) {
+                last = i;
+                System.out.println("[" + prefixCommandPairs.get(i).prefix() + "]:");
+            }
+
+            System.out.println("\t" + line);
+        }
+
+        List<String> files = new ArrayList<>();
+
+        String prefix = "logs/" + gamelogName + "/";
+        File directory = new File(prefix);
+        if (!directory.exists()) {
+            directory.mkdirs();
+        }
+
+        for (int i = 0; i < processes.size(); i++) {
+            String filename = prefix + prefixCommandPairs.get(i).prefix().toLowerCase() + ".txt";
+            files.add(filename);
+            int finalI = i;
+            List<String> output = all.stream()
+                    .filter(runAndOutputArgs -> runAndOutputArgs.index == finalI)
+                    .map(runAndOutputArgs -> runAndOutputArgs.line).toList();
+
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(filename))) {
+                for (String line : output) {
+                    writer.write(line);
+                    writer.newLine();
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        System.out.println("\nNote that output above may not be in the exact order it was output, due to terminal limitations.");
+        System.out.println("For separated ordered output, see: " + String.join(", ", files));
     }
 
     private static void serve(int port) throws IOException {
@@ -188,7 +370,7 @@ public class Starterpack {
         }
     }
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, InterruptedException {
         if (args.length < 1) {
             System.err.println(MAIN_USAGE);
             System.exit(1);
