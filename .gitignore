@@ -10,3 +10,4 @@ debuglog/
 engine/
 gamelogs/
 logs/
+src/main/java/mech/mania/starterpack/strategy/ChooseStrategy.java
