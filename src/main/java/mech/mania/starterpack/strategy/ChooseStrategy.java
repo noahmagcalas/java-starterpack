@@ -12,6 +12,6 @@ public class ChooseStrategy {
         //     return new SimpleHumanStrategy();
         // }
 
-        return new RandomStrategy();
+        return (isZombie) ? new SimpleZombieStrategy() : new SimpleHumanStrategy();
     }
 }
