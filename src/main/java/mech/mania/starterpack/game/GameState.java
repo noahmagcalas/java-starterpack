@@ -11,7 +11,7 @@ import java.util.Map;
 public record GameState(
         int turn,
         @JsonProperty("characterStates")
-        Map<String, Character> characters,
+        Map<String, Character> characterStates,
         @JsonProperty("terrainStates")
-        Map<String, Terrain> terrains
+        Map<String, Terrain> terrainStates
 ) {}
