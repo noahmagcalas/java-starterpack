@@ -12,6 +12,6 @@ public class ChooseStrategy {
         //     return new SimpleHumanStrategy();
         // }
 
-        return (isZombie) ? new SwagZombieStrategy() : new SimpleHumanStrategy();
+        return (isZombie) ? new SwagZombieStrategy() : new SwagHumanStrategy();
     }
 }

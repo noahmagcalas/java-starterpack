@@ -30,6 +30,17 @@ public class SwagHumanStrategy extends Strategy {
         );
     }
 
+    private int manhattanDistance(Position a, Position b) {
+        return (Math.abs(a.x() - b.x())
+                + Math.abs(a.y() - b.y()));
+    }
+
+    private int chebyshevDistance(Position a, Position b) {
+        return Math.max(
+                Math.abs(a.x() - b.x()),
+                Math.abs(a.y() - b.y()));
+    }
+
     @Override
     public List<MoveAction> decideMoves(
             Map<String, List<MoveAction>> possibleMoves,
@@ -53,8 +64,7 @@ public class SwagHumanStrategy extends Strategy {
                         continue;  // Ignore fellow humans
                     }
 
-                    int distance = Math.abs(c.position().x() - pos.x()) +
-                            Math.abs(c.position().y() - pos.y());
+                    int distance = manhattanDistance(c.position(), pos);
 
                     if (distance < closestZombieDistance) {
                         closestZombiePos = c.position();
@@ -64,11 +74,10 @@ public class SwagHumanStrategy extends Strategy {
 
                 int moveDistance = -1;
                 MoveAction moveChoice = moves.get(0);
-
+                
                 // Choose a move action that takes the character further from the closest zombie
                 for (MoveAction m : moves) {
-                    int distance = Math.abs(m.destination().x() - closestZombiePos.x()) +
-                            Math.abs(m.destination().y() - closestZombiePos.y());
+                    int distance = manhattanDistance(m.destination(), closestZombiePos);
 
                     if (distance > moveDistance) {
                         moveDistance = distance;
