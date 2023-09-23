@@ -43,12 +43,12 @@ public class SimpleHumanStrategy extends Strategy {
 
             // Handle the case where there is no move to be made, such as when stunned
             if (!moves.isEmpty()) {
-                Position pos = gameState.characterStates().get(characterId).position();
+                Position pos = gameState.characters().get(characterId).position();
                 Position closestZombiePos = pos;
                 int closestZombieDistance = Integer.MAX_VALUE;
 
                 // Find the closest zombie
-                for (Character c : gameState.characterStates().values()) {
+                for (Character c : gameState.characters().values()) {
                     if (!c.zombie()) {
                         continue;  // Ignore fellow humans
                     }
@@ -96,14 +96,14 @@ public class SimpleHumanStrategy extends Strategy {
 
             // Handle the case where there is no attack to be made, such as when stunned
             if (!attacks.isEmpty()) {
-                Position pos = gameState.characterStates().get(characterId).position();
+                Position pos = gameState.characters().get(characterId).position();
                 AttackAction closestZombie = null;
                 int closestZombieDistance = Integer.MAX_VALUE;
 
                 // Find the closest zombie to attack
                 for (AttackAction a : attacks) {
                     if (a.type() == AttackActionType.CHARACTER) {
-                        Position attackeePos = gameState.characterStates().get(a.attackingId()).position();
+                        Position attackeePos = gameState.characters().get(a.attackingId()).position();
 
                         int distance = Math.abs(attackeePos.x() - pos.x()) +
                                 Math.abs(attackeePos.y() - pos.y());
@@ -142,7 +142,7 @@ public class SimpleHumanStrategy extends Strategy {
 
                 // Find the human target with the least health to heal
                 for (AbilityAction a : abilities) {
-                    int health = gameState.characterStates().get(a.characterIdTarget()).health();
+                    int health = gameState.characters().get(a.characterIdTarget()).health();
 
                     if (health < leastHealth) {
                         humanTarget = a;

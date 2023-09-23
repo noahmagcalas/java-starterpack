@@ -34,11 +34,11 @@ public class SimpleZombieStrategy extends Strategy {
             List<MoveAction> moves = entry.getValue();
 
             if (!moves.isEmpty()) {
-                Position pos = gameState.characterStates().get(characterId).position();
+                Position pos = gameState.characters().get(characterId).position();
                 Position closestHumanPos = pos;
                 int closestHumanDistance = Integer.MAX_VALUE;
 
-                for (Character c : gameState.characterStates().values()) {
+                for (Character c : gameState.characters().values()) {
                     if (c.zombie()) {
                         continue;
                     }
@@ -84,13 +84,13 @@ public class SimpleZombieStrategy extends Strategy {
             List<AttackAction> attacks = entry.getValue();
 
             if (!attacks.isEmpty()) {
-                Position pos = gameState.characterStates().get(characterId).position();
+                Position pos = gameState.characters().get(characterId).position();
                 AttackAction closestZombie = null;
                 int closestZombieDistance = 404;
 
                 for (AttackAction a : attacks) {
                     if (a.type() == AttackActionType.CHARACTER) {
-                        Position attackeePos = gameState.characterStates().get(a.attackingId()).position();
+                        Position attackeePos = gameState.characters().get(a.attackingId()).position();
                         int distance = Math.abs(attackeePos.x() - pos.x())
                                 + Math.abs(attackeePos.y() - pos.y());
 
