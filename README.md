@@ -146,3 +146,12 @@ java -jar engine.jar 9001 9002
 ```
 
 </details>
+
+## Uploading
+
+Using the cli, you can upload your bot using:
+
+```ssh
+./gradlew build
+mm29 upload build/libs/starterpack.jar
+```
